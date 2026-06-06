@@ -41,7 +41,7 @@ avr-objcopy -O ihex blink.elf blink.hex
 
 Flash via USBasp:
 ```powershell
-avrdude -c usbasp -p t85 -U flash:w:blink.hex:i
+avrdude -c usbasp -p t85 -v -U flash:w:blink.hex:i
 ```
 
 Verify chip is detected:
@@ -51,17 +51,31 @@ avrdude -c usbasp -p t85 -v
 
 ## USBasp → ATtiny85 wiring
 
-| IDC pin | Signal | ATtiny85 pin |
-|---------|--------|--------------|
-| 1       | MOSI   | 5            |
-| 2       | VCC    | 8            |
-| 5       | RST    | 1            |
-| 7       | SCK    | 7            |
-| 9       | MISO   | 6            |
-| 10      | GND    | 4            |
+IDC connector orientation: notch faces toward the ribbon cable side, pin 1 is top-left.
+ATtiny85 orientation: notch faces up, pin 1 is top-left.
+
+| IDC 10-pin | Signal | ATtiny85 physical pin |
+|------------|--------|-----------------------|
+| 1          | MOSI   | 5 (PB0)               |
+| 2          | VCC    | 8                     |
+| 5          | RST    | 1                     |
+| 7          | SCK    | 7 (PB2)               |
+| 9          | MISO   | 6 (PB1)               |
+| 10         | GND    | 4                     |
+
+Pins 3, 4, 6, 8 of IDC are not connected.
 
 ## LED circuit
 
 ```
-ATtiny85 pin 5 (PB0) → 220 Ω resistor → LED+ → LED- → pin 4 (GND)
+ATtiny85 pin 3 (PB4) → 220 Ω resistor → LED+ → LED- → pin 4 (GND)
 ```
+
+## Programmable GPIO pins
+
+Only two pins are free for user code (the rest are used by ISP or power):
+
+| Physical pin | Port | Notes        |
+|--------------|------|--------------|
+| 2            | PB3  | free GPIO    |
+| 3            | PB4  | free GPIO, LED in this project |
