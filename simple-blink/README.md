@@ -11,6 +11,7 @@ First bare-metal ATtiny85 project — LED blink in pure C using avr-gcc and USBa
 ## Scheme
 
 ![](./scheme.jpg)
+![](./image1.jpg)
 
 ## Dependencies
 
