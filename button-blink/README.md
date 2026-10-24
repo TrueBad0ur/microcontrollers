@@ -10,7 +10,7 @@ Second bare-metal ATtiny85 project — LED controlled by a button, in pure C usi
 
 ## Scheme
 
-![](./scheme.jpg)
+![](../simple-blink/scheme.jpg)
 ![](./image2.jpg)
 
 ## Dependencies
@@ -24,14 +24,14 @@ Second bare-metal ATtiny85 project — LED controlled by a button, in pure C usi
 ```
 .
 ├── button.c      # source
-├── flash.ps1     # build & flash script
+├── setup.ps1     # build & flash script
 └── README.md
 ```
 
 ## Build & flash
 
 ```powershell
-.\flash.ps1 button.c
+.\setup.ps1 button.c
 ```
 
 Or manually:
