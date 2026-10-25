@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Счётчик на ATtiny13A</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one column; schematic sheets on a pale "drafting" ground, controls above, reference tables below */
+:root {
+  --bg: #f3f5f4; --sheet: #ffffff; --fg: #1d2421; --muted: #66716c; --line: #2f3a35; --grid: #e3e8e5;
+  --chip: #26302c; --chip-fg: #e9eeeb; --vcc: #c43d2f; --gnd: #2c5fa8; --hi: #e08a00; --led-off: #f1f3f2; --led-on: #ff2e1f;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", Consolas, "Courier New", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121615; --sheet: #191f1d; --fg: #e3e9e6; --muted: #93a09a; --line: #b9c6c0; --grid: #232b28;
+    --chip: #39443f; --chip-fg: #eef3f0; --vcc: #ef6b5c; --gnd: #6f9de6; --hi: #ffb02e; --led-off: #232b28; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121615; --sheet: #191f1d; --fg: #e3e9e6; --muted: #93a09a; --line: #b9c6c0; --grid: #232b28;
+  --chip: #39443f; --chip-fg: #eef3f0; --vcc: #ef6b5c; --gnd: #6f9de6; --hi: #ffb02e; --led-off: #232b28; color-scheme: dark;
+}
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.5;
+  padding: 24px max(16px, env(safe-area-inset-right, 0px)) 48px max(16px, env(safe-area-inset-left, 0px)); }
+main { max-width: 1040px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px; }
+h1 { font-size: 28px; margin: 0; text-wrap: balance; }
+h2 { font-size: 18px; margin: 0 0 10px; }
+p { margin: 0; max-width: 68ch; }
+.lead { color: var(--muted); margin-top: 6px; }
+.calc { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; padding: 14px 18px; background: var(--sheet); border: 1px solid var(--grid); border-radius: 8px; }
+.calc button { font: 600 15px var(--font-body); padding: 7px 16px; border-radius: 6px; border: 1px solid var(--grid); background: var(--bg); color: var(--fg); cursor: pointer; }
+.calc button:focus-visible { outline: 2px solid var(--hi); outline-offset: 2px; }
+.res { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.res .big { font-size: 20px; font-weight: 600; }
+.res .bin { color: var(--muted); font-size: 13px; }
+.sheet { background: var(--sheet); border: 1px solid var(--grid); border-radius: 8px; padding: 12px 12px 4px; }
+.sheet h3 { margin: 0 0 4px 6px; font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.scroll { overflow-x: auto; }
+svg.sch { display: block; width: 100%; min-width: 860px; height: auto; font-family: var(--font-mono); }
+.w { stroke: var(--line); stroke-width: 1.6; fill: none; }
+.w.on { stroke: var(--hi); stroke-width: 2.4; }
+.vcc { stroke: var(--vcc); stroke-width: 3; }
+.gnd { stroke: var(--gnd); stroke-width: 3; }
+.dot { fill: var(--line); } .dot.vccd { fill: var(--vcc); } .dot.gndd { fill: var(--gnd); }
+.body { fill: var(--chip); } .notch { fill: var(--sheet); }
+.pin { stroke: var(--line); stroke-width: 2; }
+.pn { font-size: 10px; fill: var(--muted); }
+.port { font-size: 9px; fill: var(--chip-fg); }
+.bitlbl { font-size: 13px; font-weight: 600; fill: var(--fg); }
+.lbl { font-size: 10.5px; fill: var(--fg); } .lbl.m { fill: var(--muted); }
+.rail { font-size: 11px; font-weight: 600; }
+.res-r { fill: var(--sheet); stroke: var(--line); stroke-width: 1.6; }
+.led { fill: var(--led-off); stroke: var(--line); stroke-width: 1.6; }
+.led.on { fill: var(--led-on); stroke: var(--led-on); }
+.glow { fill: var(--led-on); opacity: 0; } .glow.on { opacity: .25; }
+.flag { fill: var(--sheet); stroke: var(--line); stroke-width: 1.4; } .flag.on { stroke: var(--hi); }
+.btn { cursor: pointer; } .btn:focus { outline: none; }
+.btn .hit { fill: transparent; } .btn:focus-visible .hit { stroke: var(--hi); }
+.btn .plunger { stroke: var(--line); stroke-width: 2.2; stroke-linecap: round; }
+.btn.down .plunger { stroke: var(--hi); }
+.ct { fill: var(--sheet); stroke: var(--line); stroke-width: 1.5; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: 13px; color: var(--muted); padding: 8px 6px 10px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend svg { width: 34px; height: 14px; }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; }
+.cols > * { min-width: 0; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+th { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
+td.mono { font-family: var(--font-mono); white-space: nowrap; }
+ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+@media (prefers-reduced-motion: no-preference) { .w, .led, .glow { transition: all .15s; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>8-битный счётчик на ATtiny13A</h1>
+    <p class="lead">Восемь чипов, каждый хранит один бит. Нажатие кнопки переключает BIT 0. Когда бит переходит из 1 в 0, это перенос: pin 3 дёргает pin 7 соседа слева, и тот переключает свой бит. RESET (pin 1 всех чипов на GND) сбрасывает счёт в 0. Обе кнопки на схеме можно нажимать.</p>
+  </header>
+
+  <section class="calc">
+    <button id="press" type="button">Нажать кнопку</button>
+    <button id="reset" type="button">RESET</button>
+    <div class="res" aria-live="polite"><div class="big" id="cnt"></div><div class="bin" id="bin"></div></div>
+  </section>
+
+  <section class="sheet">
+    <h3>Старшие биты 7–4</h3>
+    <div class="scroll"><svg class="sch" id="row1" viewBox="0 0 960 385" role="img" aria-label="Схема: чипы BIT 7 – BIT 4"></svg></div>
+  </section>
+
+  <section class="sheet">
+    <h3>Младшие биты 3–0</h3>
+    <div class="scroll"><svg class="sch" id="row2" viewBox="0 0 960 385" role="img" aria-label="Схема: чипы BIT 3 – BIT 0"></svg></div>
+    <div class="legend">
+      <span><svg viewBox="0 0 34 14"><circle cx="17" cy="7" r="3.2" class="dot"/><path d="M2 7H32M17 0V14" class="w"/></svg>точка — провода соединены</span>
+      <span><svg viewBox="0 0 34 14"><path d="M2 9H12A5 5 0 0 1 22 9H32M17 0V14" class="w"/></svg>горбик — пересекаются, НЕ соединены</span>
+      <span><svg viewBox="0 0 34 14"><path d="M2 7H32" class="w on"/></svg>оранжевый — на проводе +5V (высокий уровень)</span>
+      <span>LED1…LED8 — светодиод и резистор внутри LED-модуля, горит при 0 на пине</span>
+      <span>метка Q3 и линия RST — общие провода между рядами</span>
+    </div>
+  </section>
+
+  <section class="cols">
+    <div>
+      <h2>Каждый чип (одинаково для всех 8)</h2>
+      <table>
+        <thead><tr><th>Пин</th><th>Порт</th><th>Куда</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">1</td><td class="mono">RST</td><td>общий провод RST всех 8 чипов → кнопка RESET → GND</td></tr>
+          <tr><td class="mono">2</td><td class="mono">PB3</td><td>пин LED-модуля (BIT 0 → LED1 … BIT 7 → LED8)</td></tr>
+          <tr><td class="mono">3</td><td class="mono">PB4</td><td>Q → pin 7 чипа слева (у BIT 7 никуда)</td></tr>
+          <tr><td class="mono">4</td><td class="mono">GND</td><td>шина GND</td></tr>
+          <tr><td class="mono">5</td><td class="mono">PB0</td><td>никуда</td></tr>
+          <tr><td class="mono">6</td><td class="mono">PB1</td><td>никуда</td></tr>
+          <tr><td class="mono">7</td><td class="mono">PB2</td><td>вход ← pin 3 чипа справа (у BIT 0 — кнопка на GND)</td></tr>
+          <tr><td class="mono">8</td><td class="mono">VCC</td><td>шина +5V</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div>
+      <h2>Что нужно</h2>
+      <ul>
+        <li>8 × ATtiny13A, все с одной прошивкой</li>
+        <li>LED-модуль на 8 светодиодов, его VCC на +5V</li>
+        <li>2 кнопки: счёт и RESET</li>
+        <li>Питание +5V / GND с USBasp (IDC 2 и IDC 10)</li>
+      </ul>
+      <h2 style="margin-top:18px">Как читать</h2>
+      <p>LED8 … LED1 на модуле слева направо — число в двоичном виде, 0…255. После 255 снова 0. RESET или выключение питания — счёт сбросился.</p>
+    </div>
+  </section>
+</main>
+
+<script>
+const NS = "http://www.w3.org/2000/svg";
+const W = 70, PITCH = 220, X0 = 120;
+const VCC_Y = 40, RST_Y = 62, GND_Y = 345, ROWS = [110, 130, 150, 170]; // pin rows: left 1..4, right 8..5
+let count = 0;
+const refs = { led: {}, glow: {}, s: {}, q: {}, flag: [], btn: null };
+
+function el(parent, tag, attrs, text) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (text != null) e.textContent = text;
+  parent.appendChild(e);
+  return e;
+}
+function dot(svg, x, y, cls) { el(svg, "circle", { cx: x, cy: y, r: 3.4, class: "dot " + (cls || "") }); }
+function nc(svg, x, y) { el(svg, "path", { d: `M${x - 4} ${y - 4}l8 8m0 -8l-8 8`, class: "w", "stroke-width": 1.2 }); }
+// horizontal run leftwards with a hop over a vertical wire at hx
+function hopRight(x2, y, hx) { return `H${hx - 5}A5 5 0 0 1 ${hx + 5} ${y}H${x2}`; }
+function hopLeft(x2, y, hx) { return `H${hx + 5}A5 5 0 0 0 ${hx - 5} ${y}H${x2}`; }
+
+function chip(svg, X, bit) {
+  el(svg, "text", { x: X + W / 2, y: 80, "text-anchor": "middle", class: "bitlbl" }, "BIT " + bit);
+  el(svg, "rect", { x: X, y: 92, width: W, height: 96, rx: 3, class: "body" });
+  el(svg, "path", { d: `M${X + W / 2 - 8} 92A8 8 0 0 0 ${X + W / 2 + 8} 92Z`, class: "notch" });
+  const lp = ["RST", "PB3", "PB4", "GND"], rp = ["VCC", "PB2", "PB1", "PB0"];
+  ROWS.forEach((y, i) => {
+    el(svg, "line", { x1: X - 10, y1: y, x2: X, y2: y, class: "pin" });
+    el(svg, "line", { x1: X + W, y1: y, x2: X + W + 10, y2: y, class: "pin" });
+    el(svg, "text", { x: X - 4, y: y - 4, "text-anchor": "end", class: "pn" }, i + 1);
+    el(svg, "text", { x: X + W + 4, y: y - 4, class: "pn" }, 8 - i);
+    el(svg, "text", { x: X + 4, y: y + 3, class: "port" }, lp[i]);
+    el(svg, "text", { x: X + W - 4, y: y + 3, "text-anchor": "end", class: "port" }, rp[i]);
+  });
+  // pin 1 (RST) -> common RST line
+  el(svg, "path", { d: `M${X - 10} ${ROWS[0]}H${X - 30}V${RST_Y}`, class: "w" }); dot(svg, X - 30, RST_Y);
+  nc(svg, X + W + 14, ROWS[2]);             // pin 6
+  nc(svg, X + W + 14, ROWS[3]);             // pin 5
+  // pin 8 -> +5V
+  const x8 = X + W + 18;
+  el(svg, "path", { d: `M${X + W + 10} ${ROWS[0]}H${x8}V${VCC_Y}`, class: "w" }); dot(svg, x8, VCC_Y, "vccd");
+  // pin 4 -> GND
+  const x4 = X - 20;
+  el(svg, "path", { d: `M${X - 10} ${ROWS[3]}H${x4}V${GND_Y}`, class: "w" }); dot(svg, x4, GND_Y, "gndd");
+  // pin 2 -> LED module pin LED(bit+1); inside the module: +5V -> R -> LED -> pin (lights on LOW)
+  const xs = X - 40;
+  refs.s[bit] = el(svg, "path", { d: `M${X - 10} ${ROWS[1]}H${xs}V212`, class: "w" });
+  refs.glow[bit] = el(svg, "circle", { cx: xs, cy: 220, r: 15, class: "glow" });
+  refs.led[bit] = el(svg, "path", { d: `M${xs - 8} 228H${xs + 8}L${xs} 212Z`, class: "led" });
+  el(svg, "path", { d: `M${xs - 8} 212H${xs + 8}`, class: "w" });
+  el(svg, "path", { d: `M${xs + 10} 216l6 -5m-4 0h4v4M${xs + 10} 222l6 -5m-4 0h4v4`, class: "w", "stroke-width": 1 });
+  el(svg, "path", { d: `M${xs} 228V244M${xs} 272V306`, class: "w" });
+  el(svg, "rect", { x: xs - 6, y: 244, width: 12, height: 28, rx: 2, class: "res-r" });
+  el(svg, "path", { d: `M${xs - 7} 306H${xs + 7}`, class: "vcc" });
+  el(svg, "text", { x: xs, y: 320, "text-anchor": "middle", class: "lbl", fill: "var(--vcc)" }, "+5V");
+  el(svg, "text", { x: xs, y: GND_Y + 22, "text-anchor": "middle", class: "lbl" }, "LED" + (bit + 1));
+}
+
+function flag(svg, x, y, text, right, bit) {
+  const w = 132, h = 22, x0 = right ? x : x - w;
+  const f = el(svg, "rect", { x: x0, y, width: w, height: h, rx: 11, class: "flag" });
+  el(svg, "text", { x: x0 + w / 2, y: y + 15, "text-anchor": "middle", class: "lbl" }, text);
+  refs.flag.push({ el: f, bit });
+}
+
+function button(svg, x, name, onPress) {
+  const g = el(svg, "g", { class: "btn", tabindex: 0, role: "button", "aria-label": name });
+  el(g, "rect", { x: x - 22, y: 222, width: 44, height: 64, rx: 4, class: "hit" });
+  el(g, "circle", { cx: x, cy: 238, r: 3, class: "ct" });
+  el(g, "circle", { cx: x, cy: 270, r: 3, class: "ct" });
+  g._p = el(g, "path", { d: `M${x - 12} 246V262M${x - 12} 254H${x - 20}`, class: "plunger" });
+  el(g, "text", { x: x + 8, y: 258, class: "lbl" }, name);
+  g.addEventListener("click", onPress);
+  g.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPress(); } });
+  return g;
+}
+
+function row(svg, bits) {
+  el(svg, "line", { x1: 14, y1: VCC_Y, x2: 946, y2: VCC_Y, class: "vcc" });
+  el(svg, "line", { x1: 14, y1: GND_Y, x2: 946, y2: GND_Y, class: "gnd" });
+  el(svg, "text", { x: 16, y: VCC_Y - 10, class: "rail", fill: "var(--vcc)" }, "+5V  (USBasp IDC 2)");
+  el(svg, "text", { x: 946, y: GND_Y + 36, "text-anchor": "end", class: "rail", fill: "var(--gnd)" }, "GND  (USBasp IDC 10)");
+  bits.forEach((bit, i) => chip(svg, X0 + i * PITCH, bit));
+
+  // common RST line: hops over the pin 8 wires
+  let d = `M${bits[0] === 7 ? 36 : 16} ${RST_Y}`;
+  for (let i = 0; i < bits.length; i++) {
+    const X = X0 + i * PITCH;
+    if (i > 0 || bits[0] !== 7) d += `H${X - 30}`;
+    if (i < bits.length - 1 || bits[0] === 7) d += hopRight(X + W + 28, RST_Y, X + W + 18);
+  }
+  if (bits[0] === 7) {
+    d += "H900";
+    el(svg, "path", { d, class: "w" });
+    el(svg, "text", { x: 946, y: RST_Y - 5, "text-anchor": "end", class: "lbl m" }, "RST ↓");
+    el(svg, "path", { d: `M36 ${RST_Y}V238M36 270V${GND_Y}`, class: "w" });
+    dot(svg, 36, GND_Y, "gndd");
+    refs.rst = button(svg, 36, "RST", doReset);
+  } else {
+    el(svg, "path", { d, class: "w" });
+    el(svg, "text", { x: 16, y: RST_Y - 5, class: "lbl m" }, "RST ↑");
+  }
+
+  // inside the row: right chip pin 3 (Q) -> left chip pin 7 (clock in)
+  for (let i = 1; i < bits.length; i++) {
+    const Xr = X0 + i * PITCH, Xl = Xr - PITCH, xc = Xl + W + 80;
+    refs.q[bits[i]] = el(svg, "path", { d: `M${Xr - 10} ${ROWS[2]}${hopLeft(xc, ROWS[2], Xr - 40)}V${ROWS[1]}H${Xl + W + 10}`, class: "w" });
+    el(svg, "text", { x: xc + 4, y: ROWS[1] - 5, class: "lbl m" }, "Q" + bits[i]);
+  }
+
+  const Xf = X0, Xe = X0 + (bits.length - 1) * PITCH;
+  const xout = Xf - 70, xin = Xe + W + 80;
+
+  if (bits[0] === 7) {
+    nc(svg, Xf - 14, ROWS[2]);              // BIT 7 pin 3: not connected
+  } else {
+    refs.q[3] = el(svg, "path", { d: `M${Xf - 10} ${ROWS[2]}${hopLeft(xout, ROWS[2], Xf - 40)}V196`, class: "w" });
+    flag(svg, xout - 40, 196, "Q3 → BIT 4 pin 7", true, 3);
+  }
+  if (bits[bits.length - 1] === 0) {
+    el(svg, "path", { d: `M${Xe + W + 10} ${ROWS[1]}H${xin}V238M${xin} 270V${GND_Y}`, class: "w" });
+    dot(svg, xin, GND_Y, "gndd");
+    refs.btn = button(svg, xin, "BTN", press);
+  } else {
+    refs.q["3in"] = el(svg, "path", { d: `M${Xe + W + 10} ${ROWS[1]}H${xin}V196`, class: "w" });
+    flag(svg, xin + 12, 196, "Q3 ← BIT 3 pin 3", false, 3);
+  }
+}
+
+row(document.getElementById("row1"), [7, 6, 5, 4]);
+row(document.getElementById("row2"), [3, 2, 1, 0]);
+
+function press() {
+  count = (count + 1) & 255;
+  refs.btn.classList.add("down");
+  refs.btn._p.setAttribute("transform", "translate(12 0)");
+  setTimeout(() => { refs.btn.classList.remove("down"); refs.btn._p.removeAttribute("transform"); }, 150);
+  render();
+}
+document.getElementById("press").addEventListener("click", press);
+function doReset() {
+  count = 0;
+  refs.rst.classList.add("down");
+  refs.rst._p.setAttribute("transform", "translate(12 0)");
+  setTimeout(() => { refs.rst.classList.remove("down"); refs.rst._p.removeAttribute("transform"); }, 150);
+  render();
+}
+document.getElementById("reset").addEventListener("click", doReset);
+
+function render() {
+  for (let i = 0; i < 8; i++) {
+    const q = (count >> i) & 1;
+    refs.led[i].classList.toggle("on", !!q);
+    refs.glow[i].classList.toggle("on", !!q);
+    refs.s[i].classList.toggle("on", !q);   // active low: wire is HIGH when the bit is 0
+    if (refs.q[i]) refs.q[i].classList.toggle("on", !!q);
+  }
+  refs.q["3in"].classList.toggle("on", !!((count >> 3) & 1));
+  refs.flag.forEach(f => f.el.classList.toggle("on", !!((count >> f.bit) & 1)));
+  document.getElementById("cnt").textContent = "Счёт: " + count;
+  document.getElementById("bin").textContent = count.toString(2).padStart(8, "0").replace(/^(.{4})/, "$1 ") + "  (LED8…LED1)";
+}
+render();
+</script>
+</body>
+</html>
